@@ -52,14 +52,18 @@ foreach ($platform in $buildMatrix) {
     Write-Host "`nBuilding for $name ($rid)..." @Yellow
     
     try {
-        # Clean previous build
-        if (Test-Path "bin/Release/net8.0/$rid") {
-            Remove-Item -Path "bin/Release/net8.0/$rid" -Recurse -Force
+        # Restore
+        Write-Host "  Restoring dependencies..."
+        & dotnet restore DOHRelay/DOHRelay.csproj | Out-Null
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "Restore failed for $rid"
         }
         
         # Publish
         $publishArgs = @(
             "publish"
+            "DOHRelay/DOHRelay.csproj"
             "-c", "Release"
             "-r", $rid
             "--no-restore"

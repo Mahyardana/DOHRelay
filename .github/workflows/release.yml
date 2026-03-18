@@ -66,13 +66,13 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore DOHRelay/DOHRelay.csproj
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build DOHRelay/DOHRelay.csproj -c Release --no-restore
 
       - name: Publish for ${{ matrix.rid }}
-        run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained --no-restore -o ./publish
+        run: dotnet publish DOHRelay/DOHRelay.csproj -c Release -r ${{ matrix.rid }} --self-contained --no-restore -o ./publish
 
       - name: Create archive (Windows)
         if: runner.os == 'Windows'

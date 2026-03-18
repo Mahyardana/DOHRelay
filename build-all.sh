@@ -56,12 +56,17 @@ for i in "${!PLATFORMS[@]}"; do
     
     echo -e "\n${YELLOW}Building for $NAME ($RID)...${NC}"
     
-    # Clean previous build
-    rm -rf "bin/Release/net8.0/$RID" 2>/dev/null || true
+    # Restore dependencies
+    echo "  Restoring dependencies..."
+    if ! dotnet restore DOHRelay/DOHRelay.csproj > /dev/null 2>&1; then
+        echo -e "  ${RED}✗ Restore failed for $RID${NC}"
+        ((FAIL_COUNT++))
+        continue
+    fi
     
     # Publish
     echo "  Publishing..."
-    PUBLISH_CMD="dotnet publish -c Release -r $RID --no-restore"
+    PUBLISH_CMD="dotnet publish DOHRelay/DOHRelay.csproj -c Release -r $RID --no-restore"
     
     if [ "$SELF_CONTAINED" = "true" ]; then
         PUBLISH_CMD="$PUBLISH_CMD --self-contained"
