@@ -13,47 +13,22 @@ jobs:
     strategy:
       matrix:
         include:
-          # Windows builds
+          # Windows x64
           - os: windows-latest
             rid: win-x64
             artifact_name: DOHRelay-win-x64
             extension: .zip
           
-          - os: windows-latest
-            rid: win-x86
-            artifact_name: DOHRelay-win-x86
-            extension: .zip
-          
-          - os: windows-latest
-            rid: win-arm64
-            artifact_name: DOHRelay-win-arm64
-            extension: .zip
-          
-          # Linux builds
+          # Linux x64
           - os: ubuntu-latest
             rid: linux-x64
             artifact_name: DOHRelay-linux-x64
             extension: .tar.gz
           
-          - os: ubuntu-latest
-            rid: linux-arm64
-            artifact_name: DOHRelay-linux-arm64
-            extension: .tar.gz
-          
-          - os: ubuntu-latest
-            rid: linux-arm
-            artifact_name: DOHRelay-linux-arm
-            extension: .tar.gz
-          
-          # macOS builds
+          # macOS x64
           - os: macos-latest
             rid: osx-x64
             artifact_name: DOHRelay-osx-x64
-            extension: .tar.gz
-          
-          - os: macos-latest
-            rid: osx-arm64
-            artifact_name: DOHRelay-osx-arm64
             extension: .tar.gz
 
     steps:
@@ -127,18 +102,13 @@ jobs:
             ### Platform Downloads
 
             **Windows:**
-            - `DOHRelay-win-x64.zip` - Windows x86-64 (64-bit)
-            - `DOHRelay-win-x86.zip` - Windows x86 (32-bit)
-            - `DOHRelay-win-arm64.zip` - Windows ARM64
+            - `DOHRelay-win-x64.zip` - Windows x64
 
             **Linux:**
-            - `DOHRelay-linux-x64.tar.gz` - Linux x86-64 (64-bit)
-            - `DOHRelay-linux-arm64.tar.gz` - Linux ARM64 (Raspberry Pi 4, etc.)
-            - `DOHRelay-linux-arm.tar.gz` - Linux ARM (Raspberry Pi 2/3, etc.)
+            - `DOHRelay-linux-x64.tar.gz` - Linux x64
 
             **macOS:**
-            - `DOHRelay-osx-x64.tar.gz` - macOS Intel (x86-64)
-            - `DOHRelay-osx-arm64.tar.gz` - macOS Apple Silicon (ARM64)
+            - `DOHRelay-osx-x64.tar.gz` - macOS x64 (Intel)
 
             ### Installation Instructions
 
@@ -191,7 +161,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64
           push: ${{ startsWith(github.ref, 'refs/tags/') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
