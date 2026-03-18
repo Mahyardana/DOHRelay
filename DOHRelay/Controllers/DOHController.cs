@@ -1,30 +1,47 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Net;
 using System.Net.Http.Headers;
-using System.Text;
 
 namespace DOHRelay.Controllers
 {
     [ApiController]
     public class DOHController : ControllerBase
     {
+        private readonly IHttpClientFactory _httpClientFactory;
+
+        public DOHController(IHttpClientFactory httpClientFactory)
+        {
+            _httpClientFactory = httpClientFactory;
+        }
 
         [HttpGet("dns-query")]
-        public FileContentResult Get([FromQuery] string dns)
+        public async Task<FileContentResult> Get([FromQuery] string dns)
         {
-            var response = new WebClient().DownloadData("https://one.one.one.one/dns-query?dns=" + dns);
+            var client = _httpClientFactory.CreateClient("cloudflare-doh");
+            var response = await client.GetByteArrayAsync("https://one.one.one.one/dns-query?dns=" + dns);
             return new FileContentResult(response, "application/dns-message");
         }
+
         [HttpPost("dns-query")]
-        public FileContentResult Post()
+        public async Task<FileContentResult> Post()
         {
-            var body = new byte[1024];
-            Request.Body.ReadAsync(body, 0, Convert.ToInt32(Request.ContentLength)).Wait();
-            var content = new ByteArrayContent(body, 0, Convert.ToInt32(Request.ContentLength));
+            var body = await new BinaryReader(Request.Body).BaseStream.ReadAllBytesAsync();
+            var content = new ByteArrayContent(body);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/dns-message");
-            var response = new HttpClient().PostAsync("https://one.one.one.one/dns-query", content).Result;
-            var respbytes = response.Content.ReadAsByteArrayAsync().Result;
-            return new FileContentResult(respbytes, "application/dns-message");
+
+            var client = _httpClientFactory.CreateClient("cloudflare-doh");
+            var response = await client.PostAsync("https://one.one.one.one/dns-query", content);
+            var respBytes = await response.Content.ReadAsByteArrayAsync();
+            return new FileContentResult(respBytes, "application/dns-message");
+        }
+    }
+
+    internal static class StreamExtensions
+    {
+        internal static async Task<byte[]> ReadAllBytesAsync(this Stream stream)
+        {
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            return ms.ToArray();
         }
     }
 }
