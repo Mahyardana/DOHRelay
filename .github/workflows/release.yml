@@ -183,8 +183,9 @@ jobs:
         id: meta
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tags=ghcr.io/${{ github.repository }}:$VERSION,ghcr.io/${{ github.repository }}:latest" >> $GITHUB_OUTPUT
+          echo "tags=ghcr.io/${REPO_LOWER}:${VERSION},ghcr.io/${REPO_LOWER}:latest" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
