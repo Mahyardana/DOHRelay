@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  dohrelay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dohrelay
+    image: dohrelay:latest
+    restart: unless-stopped
+    
+    ports:
+      - "5000:5000"
+    
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+    
+    networks:
+      - dohrelay-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    
+    # Optional: Limit resource usage
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 256M
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 128M
+
+  # Optional: Reverse proxy with nginx
+  nginx:
+    image: nginx:latest
+    container_name: dohrelay-nginx
+    restart: unless-stopped
+    
+    ports:
+      - "80:80"
+      # - "443:443"  # Uncomment for HTTPS with certificates
+    
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # - ./certs:/etc/nginx/certs:ro  # Uncomment for HTTPS
+    
+    depends_on:
+      - dohrelay
+    
+    networks:
+      - dohrelay-network
+
+networks:
+  dohrelay-network:
+    driver: bridge
+
+# ============================================================================
+# Usage:
+#   Start services:    docker-compose up -d
+#   Stop services:     docker-compose down
+#   View logs:         docker-compose logs -f dohrelay
+#   Rebuild image:     docker-compose build --no-cache
+# ============================================================================

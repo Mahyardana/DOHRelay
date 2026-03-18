@@ -1,0 +1,218 @@
+name: Multi-Platform Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build for ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Windows builds
+          - os: windows-latest
+            rid: win-x64
+            artifact_name: DOHRelay-win-x64
+            extension: .zip
+          
+          - os: windows-latest
+            rid: win-x86
+            artifact_name: DOHRelay-win-x86
+            extension: .zip
+          
+          - os: windows-latest
+            rid: win-arm64
+            artifact_name: DOHRelay-win-arm64
+            extension: .zip
+          
+          # Linux builds
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact_name: DOHRelay-linux-x64
+            extension: .tar.gz
+          
+          - os: ubuntu-latest
+            rid: linux-arm64
+            artifact_name: DOHRelay-linux-arm64
+            extension: .tar.gz
+          
+          - os: ubuntu-latest
+            rid: linux-arm
+            artifact_name: DOHRelay-linux-arm
+            extension: .tar.gz
+          
+          # macOS builds
+          - os: macos-latest
+            rid: osx-x64
+            artifact_name: DOHRelay-osx-x64
+            extension: .tar.gz
+          
+          - os: macos-latest
+            rid: osx-arm64
+            artifact_name: DOHRelay-osx-arm64
+            extension: .tar.gz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish for ${{ matrix.rid }}
+        run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained --no-restore -o ./publish
+
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          powershell -Command "Compress-Archive -Path './publish/*' -DestinationPath '${{ matrix.artifact_name }}.zip' -Force"
+
+      - name: Create archive (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd publish
+          tar czf ../${{ matrix.artifact_name }}.tar.gz .
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}${{ matrix.extension }}
+          retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display structure of artifacts
+        run: find ./artifacts -type f
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./artifacts/**/*
+          draft: false
+          prerelease: false
+          body: |
+            ## DOHRelay ${{ github.ref_name }}
+
+            This release includes builds for multiple platforms and architectures.
+
+            ### Platform Downloads
+
+            **Windows:**
+            - `DOHRelay-win-x64.zip` - Windows x86-64 (64-bit)
+            - `DOHRelay-win-x86.zip` - Windows x86 (32-bit)
+            - `DOHRelay-win-arm64.zip` - Windows ARM64
+
+            **Linux:**
+            - `DOHRelay-linux-x64.tar.gz` - Linux x86-64 (64-bit)
+            - `DOHRelay-linux-arm64.tar.gz` - Linux ARM64 (Raspberry Pi 4, etc.)
+            - `DOHRelay-linux-arm.tar.gz` - Linux ARM (Raspberry Pi 2/3, etc.)
+
+            **macOS:**
+            - `DOHRelay-osx-x64.tar.gz` - macOS Intel (x86-64)
+            - `DOHRelay-osx-arm64.tar.gz` - macOS Apple Silicon (ARM64)
+
+            ### Installation Instructions
+
+            1. Download the appropriate archive for your platform
+            2. Extract the archive
+            3. For Linux: `chmod +x DOHRelay` to make executable
+            4. Run: `./DOHRelay` (Linux/macOS) or `DOHRelay.exe` (Windows)
+
+            See [CONFIGURATION.md](https://github.com/${{ github.repository }}/blob/main/CONFIGURATION.md) for detailed setup instructions.
+
+            ### Changes in this release
+
+            [View on GitHub](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.ref }})
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker-build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        if: secrets.DOCKER_USERNAME != ''
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: meta
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tags=ghcr.io/${{ github.repository }}:$VERSION,ghcr.io/${{ github.repository }}:latest" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Push to Docker Hub (if configured)
+        if: secrets.DOCKER_USERNAME != ''
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/dohrelay:${{ steps.meta.outputs.version }}
+            ${{ secrets.DOCKER_USERNAME }}/dohrelay:latest
+          labels: |
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
