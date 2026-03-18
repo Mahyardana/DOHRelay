@@ -49,7 +49,7 @@ FROM mcr.microsoft.com/dotnet/runtime:8.0
 WORKDIR /app
 
 # Copy published application
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 # Create non-root user for security
 RUN addgroup --gid 1001 dohrelay && \
