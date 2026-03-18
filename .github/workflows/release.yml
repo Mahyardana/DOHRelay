@@ -13,22 +13,37 @@ jobs:
     strategy:
       matrix:
         include:
-          # Windows x64
+          # Windows builds (x64 and ARM64, no x86)
           - os: windows-latest
             rid: win-x64
             artifact_name: DOHRelay-win-x64
             extension: .zip
           
-          # Linux x64
+          - os: windows-latest
+            rid: win-arm64
+            artifact_name: DOHRelay-win-arm64
+            extension: .zip
+          
+          # Linux builds (x64 and ARM64, no 32-bit ARM)
           - os: ubuntu-latest
             rid: linux-x64
             artifact_name: DOHRelay-linux-x64
             extension: .tar.gz
           
-          # macOS x64
+          - os: ubuntu-latest
+            rid: linux-arm64
+            artifact_name: DOHRelay-linux-arm64
+            extension: .tar.gz
+          
+          # macOS builds (x64 and ARM64)
           - os: macos-latest
             rid: osx-x64
             artifact_name: DOHRelay-osx-x64
+            extension: .tar.gz
+          
+          - os: macos-latest
+            rid: osx-arm64
+            artifact_name: DOHRelay-osx-arm64
             extension: .tar.gz
 
     steps:
@@ -103,12 +118,15 @@ jobs:
 
             **Windows:**
             - `DOHRelay-win-x64.zip` - Windows x64
+            - `DOHRelay-win-arm64.zip` - Windows ARM64
 
             **Linux:**
             - `DOHRelay-linux-x64.tar.gz` - Linux x64
+            - `DOHRelay-linux-arm64.tar.gz` - Linux ARM64 (Raspberry Pi 4, etc.)
 
             **macOS:**
-            - `DOHRelay-osx-x64.tar.gz` - macOS x64 (Intel)
+            - `DOHRelay-osx-x64.tar.gz` - macOS Intel
+            - `DOHRelay-osx-arm64.tar.gz` - macOS Apple Silicon (M1/M2/M3)
 
             ### Installation Instructions
 
@@ -117,7 +135,7 @@ jobs:
             3. For Linux: `chmod +x DOHRelay` to make executable
             4. Run: `./DOHRelay` (Linux/macOS) or `DOHRelay.exe` (Windows)
 
-            See [CONFIGURATION.md](https://github.com/${{ github.repository }}/blob/main/CONFIGURATION.md) for detailed setup instructions.
+            See [CONFIGURATION.md](https://github.com/${{ github.repository }}/blob/master/CONFIGURATION.md) for detailed setup instructions.
 
             ### Changes in this release
 
@@ -161,7 +179,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: ${{ startsWith(github.ref, 'refs/tags/') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: |

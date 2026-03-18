@@ -3,32 +3,43 @@
 # Build: docker build -t dohrelay:latest .
 # Multi-arch: docker buildx build --platform linux/amd64,linux/arm64 -t dohrelay:latest .
 
+# BUILDPLATFORM = platform of the build host (always native, no QEMU for SDK)
+# TARGETPLATFORM = destination platform for the runtime image
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+ARG TARGETARCH
+
 # ============================================================================
-# Build Stage
+# Build Stage — always runs on the host platform to avoid QEMU segfaults
 # ============================================================================
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+ARG TARGETARCH
 
 WORKDIR /src
 
 # Copy project file
 COPY ["DOHRelay/DOHRelay.csproj", "DOHRelay/"]
 
-# Restore dependencies
-RUN dotnet restore "DOHRelay/DOHRelay.csproj"
+# Restore for the target RID
+RUN case "$TARGETARCH" in \
+        amd64) RID=linux-x64 ;; \
+        arm64) RID=linux-arm64 ;; \
+        *) echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1 ;; \
+    esac && \
+    dotnet restore "DOHRelay/DOHRelay.csproj" -r $RID
 
 # Copy application source
 COPY . .
 
-# Build application
+# Publish for the target RID (cross-compiled on native host, no emulation needed)
 WORKDIR "/src/DOHRelay"
-RUN dotnet build "DOHRelay.csproj" -c Release -o /app/build --no-restore
-
-# ============================================================================
-# Publish Stage
-# ============================================================================
-FROM build AS publish
-
-RUN dotnet publish "DOHRelay.csproj" -c Release -o /app/publish --no-restore --no-build
+RUN case "$TARGETARCH" in \
+        amd64) RID=linux-x64 ;; \
+        arm64) RID=linux-arm64 ;; \
+        *) echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1 ;; \
+    esac && \
+    dotnet publish "DOHRelay.csproj" -c Release -r $RID --self-contained -o /app/publish
 
 # ============================================================================
 # Runtime Stage
